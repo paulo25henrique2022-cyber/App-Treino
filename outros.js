@@ -1,92 +1,84 @@
 /* ===== MUSCULAÇÃO ===== */
-const MUSC_ABAS = [['mapa', 'Mapa muscular'], ['sabado', 'Sábado'], ['semana', 'Semana'], ['along', 'Alongamento']];
-V.musculacao = (sub = 'mapa') => `<div class="escuro">${topo('Musculação')}${abas('musculacao', MUSC_ABAS, sub)}${(MV[sub] || MV.mapa)()}</div>`;
-const MV = {};
-MV.mapa = () => {
-  const grupos = [1, 2, 3].map(pr => `<h3>${['', '🔴 Essenciais para o karatê', '🟠 Importantes', '⚪ Gerais'][pr]}</h3>${DATA.musculos.filter(m => m.prioridade === pr).map(m => `<button class="tag p${pr}" data-act="musInfo" data-arg="${m.id}">${m.nome}${m.profundo ? ' ·prof.' : ''}</button>`).join('')}`).join('');
-  return `<section class="card"><p class="peq">Foco em <b>entender</b>: o treino é do seu professor. Toque num músculo para ver a função no karatê e como treinar sem encurtar. Tracejado = músculo profundo.</p>
-  ${mapa([], { todos: true, clic: true, vista: mapaVistaForcada || 'frente' })}${grupos}</section>
-  <section class="card peq"><b>Regras que valem sempre:</b> amplitude completa · descida lenta (2–3 s) · subida rápida · nada que carregue a patela.<br><br>
-  <b>Pesquisa:</b> musculação com amplitude completa melhora a flexibilidade tanto quanto o alongamento (meta-análises de 2021 e 2023); o treino excêntrico aumenta o comprimento das fibras do posterior da coxa; no karatê de elite, a velocidade pesa mais que a força máxima.</section>`;
+V.musculacao = () => menuArte('musc_menu.jpg', 900, 1599, [['#/musculacao/mapa', 8.5, 42.6, 83.1, 13, 'Mapa muscular'], ['#/musculacao/sabado', 8.5, 57.7, 83.1, 13.6, 'Treino de sábado'], ['#/musculacao/semana', 8.5, 73.3, 83.1, 13.6, 'Meta da semana']], '#/', 'Musculação');
+const JM = (t, k, c) => janela('musc_menu.jpg', t, k, '#/musculacao', c);
+V['musculacao/mapa'] = () => {
+  const reg = window.musRegistrando;
+  const grupos = [1, 2, 3].map(pr => `<h3>${['', '🔴 Essenciais para o karatê', '🟠 Importantes', '⚪ Gerais'][pr]}</h3>${musculos().filter(m => m.prioridade === pr).map(m => `<button class="tag p${pr}" data-act="musInfo" data-arg="${m.id}">${esc(m.nome)}${m.profundo ? ' ·prof.' : ''}${m.extra ? ' ✎' : ''}</button>`).join('')}`).join('');
+  return JM('Mapa Muscular', '筋肉図', `<div class="washi"><p class="peq">Foco em <b>entender</b>: o treino é do seu professor. Toque num músculo para ver a função no karatê e como treinar sem encurtar. Tracejado = músculo profundo.</p>
+   ${reg ? '<p class="destaque-box">📍 Toque no mapa, no ponto onde fica o músculo novo. Troque a vista (frente, costas, lado) se precisar.</p><button class="btn sec" data-act="musCancelar">Cancelar</button>' : '<button class="btn" data-act="musNovo">+ Registrar músculo novo</button>'}
+   <div data-act="mapaToque">${mapa([], { todos: true, vista: 'frente' })}</div>${grupos}</div>
+   <div class="washi peq"><b>Regras que valem sempre:</b> amplitude completa · descida lenta (2–3 s) · subida rápida · nada que carregue a patela.<br><br><b>Pesquisa:</b> musculação com amplitude completa melhora a flexibilidade tanto quanto o alongamento (meta-análises de 2021 e 2023); o treino excêntrico aumenta o comprimento das fibras do posterior da coxa; no karatê de elite, a velocidade pesa mais que a força máxima.</div>`);
 };
-MV.sabado = () => {
+ACT.musNovo = () => { window.musRegistrando = true; rerender(); };
+ACT.musCancelar = () => { window.musRegistrando = false; rerender(); };
+ACT.mapaToque = (_, el, ev) => {
+  if (!window.musRegistrando) { const e = ev.target.closest('ellipse'); if (e && e.dataset.id) ACT.musInfo(e.dataset.id); return; }
+  const svg = el.querySelector('svg'); const pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+  const p = pt.matrixTransform(svg.getScreenCTM().inverse()); if (ev.target.closest('.mapa-tabs')) { const b = ev.target.closest('button'); if (b) ACT.mapaVista(b.dataset.arg, b); return; }
+  const vista = Object.entries(VISTAS).find(([, v]) => p.x >= v[0] && p.x <= v[0] + v[2])?.[0] || 'frente';
+  window.musPonto = { x: Math.round(p.x), y: Math.round(p.y), vista };
+  modal(`<h3>Novo músculo</h3><p class="peq">Ponto marcado na vista <b>${vista}</b>.</p>
+   <input id="mNome" class="campo" placeholder="Nome (ex.: Braquiorradial)"><input id="mTec" class="campo" placeholder="Nome técnico (opcional)">
+   <label>Prioridade no karatê<select id="mPri"><option value="1">🔴 Essencial</option><option value="2" selected>🟠 Importante</option><option value="3">⚪ Geral</option></select></label>
+   <label>Tamanho da marcação<select id="mTam"><option value="18">Pequeno</option><option value="30" selected>Médio</option><option value="45">Grande</option></select></label>
+   <label class="linha"><input type="checkbox" id="mProf"> Músculo profundo</label>
+   <textarea id="mFun" class="campo" placeholder="Função no karatê"></textarea><textarea id="mCom" class="campo" placeholder="Como treinar sem encurtar"></textarea>
+   <button class="btn" data-act="musSalvar">Salvar músculo</button>`);
+};
+ACT.musSalvar = () => {
+  const g = i => document.getElementById(i), n = g('mNome').value.trim(); if (!n) return toast('Digite o nome'); const t = +g('mTam').value, p = window.musPonto;
+  S.musculosExtra.push({ id: 'x' + Date.now(), nome: n, tecnico: g('mTec').value.trim(), vista: p.vista, prioridade: +g('mPri').value, profundo: g('mProf').checked,
+    funcao_karate: g('mFun').value.trim() || '—', como_treinar: g('mCom').value.trim() || '—', area: [[p.x, p.y, Math.round(t * .8), t]], extra: true });
+  window.musRegistrando = false; salvar(); ACT.fecharModal(); toast('Músculo registrado'); rerender();
+};
+ACT.musDel = id => { if (!confirm('Apagar este músculo?')) return; S.musculosExtra = S.musculosExtra.filter(m => m.id !== id); salvar(); ACT.fecharModal(); rerender(); };
+V['musculacao/sabado'] = () => {
   const d = D(), sb = DATA.sabado;
-  return `<section class="card"><h2>Sábado · ${sb.horario} · explosão, panturrilhas e core</h2><ul class="peq">${sb.regras.map(r => `<li>${r}</li>`).join('')}</ul>
-   <button class="btn" data-act="alTimer" data-arg="90">⏱️ Descanso 90 s</button></section>
-   ${sb.blocos.map((b, i) => `<div class="card">${chk((d.sab || {})[i], 'sabItem', i, b.exercicio, b.bloco + (b.series ? ' · ' + b.series : '') + (b.minutos ? ' · ' + b.minutos + ' min' : ''))}
-     ${b.musculos.length ? `<details><summary class="lnk">ver músculos</summary>${mapa(b.musculos, { vista: mapaVistaForcada })}${nomesMus(b.musculos)}</details>` : '<p><a href="#/karate/along">abrir alongamentos</a></p>'}</div>`).join('')}
-   <section class="card">${chk(d.musc, 'muscHoje', '', '✅ Treino de sábado concluído')}</section>`;
+  return JM('Treino de Sábado', '土曜', `<div class="washi"><p><b>Explosão, panturrilhas e core</b></p><ul class="peq">${sb.regras.map(r => `<li>${r}</li>`).join('')}</ul><button class="btn sec" data-act="alTimer" data-arg="90">⏱️ Descanso 90 s</button></div>
+   ${sb.blocos.filter(b => b.bloco !== 'Volta à calma' && b.bloco !== 'Aquecimento').map(b => { const i = sb.blocos.indexOf(b); return `<div class="washi">${chk((d.sab || {})[i], 'sabItem', i, esc(b.exercicio), b.bloco + (b.series ? ' · ' + b.series : ''))}
+     <details><summary class="lnk">ver músculos</summary>${mapa(b.musculos)}${nomesMus(b.musculos)}</details></div>`; }).join('')}
+   <div class="washi">${chk(d.musc, 'muscHoje', '', '✅ Treino de sábado concluído')}</div>`);
 };
 ACT.sabItem = i => { const d = D(); d.sab = d.sab || {}; d.sab[i] = !d.sab[i]; salvar(); rerender(); };
 ACT.muscHoje = () => { const d = D(); d.musc = !d.musc; salvar(); rerender(); };
-MV.semana = () => {
-  const s = semana(hoje()); let n = 0, linhas = '';
-  for (let i = 0; i < 7; i++) { const x = soma(s, i), v = (P().dias[x] || {}).musc; if (v) n++; linhas += `<div class="item">${fmtData(x)} ${v ? '✅' : ''}</div>`; }
-  return `<section class="card"><h2>Meta da semana: ${n}/3</h2>${barra(n / 3 * 100)}<p class="peq">2 aulas com o professor (dias variáveis) + o sábado.</p>
-   ${chk(D().musc, 'muscHoje', '', 'Treinei musculação hoje')}${linhas}</section>`;
+V['musculacao/semana'] = () => {
+  const s = semana(hoje()); let n = 0, l = '';
+  for (let i = 0; i < 7; i++) { const x = soma(s, i), v = (S.dias[x] || {}).musc; if (v) n++; l += `<div class="item">${fmtData(x)}<span>${v ? '✅' : ''}</span></div>`; }
+  return JM('Meta da Semana', '目標', `<div class="washi"><h2>${n}/3 treinos</h2>${barra(n / 3 * 100)}<p class="peq">2 aulas com o professor + o treino de sábado.</p>${chk(D().musc, 'muscHoje', '', 'Treinei musculação hoje')}${l}</div>`);
 };
-MV.along = () => `<section class="card"><p>Antes: dinâmico dos músculos do dia. Depois: estático dos músculos treinados.</p><a class="btn" href="#/karate/along">Abrir alongamentos com mapa e cronômetro</a></section>`;
 
 /* ===== NATAÇÃO ===== */
-const NAT_ABAS = [['inicio', 'Hoje'], ['dicionario', 'Dicionário'], ['estilos', 'Estilos'], ['caderno', 'Caderno'], ['marcos', 'Marcos']];
-V.natacao = (sub = 'inicio') => `<div class="escuro azul">${topo('Natação')}${abas('natacao', NAT_ABAS, sub)}${(NV[sub] || NV.inicio)()}</div>`;
-const NV = {};
-function natSemana() { const s = semana(hoje()); let n = 0; for (let i = 0; i < 7; i++) if ((P().dias[soma(s, i)] || {}).nat) n++; return n; }
-NV.inicio = () => {
-  const c = P().natacao.caderno; const ult = c[c.length - 1];
-  const prox = treinosDoDia(hoje()).find(t => t.tipo === 'natacao');
-  return `<section class="card"><h2>${prox ? 'Aula hoje às ' + prox.ini : 'Próxima aula: ' + proxNat()}</h2>
-   ${ult ? `<div class="destaque-box">📝 Última correção do professor (${fmtData(ult.data)}):<br><b>${esc(ult.texto)}</b></div>` : '<p class="peq">Nenhuma correção anotada ainda.</p>'}
-   <h3>Meta da semana: ${natSemana()}/2 aulas</h3>${barra(natSemana() / 2 * 100)}
-   ${chk(D().nat, 'natHoje', '', 'Fui na aula hoje')}
-   <p><a href="#/karate/along">Alongamento</a>: antes ombros, tronco, quadril e tornozelos; depois ombros, peito, tríceps, lombar e panturrilha.</p></section>`;
-};
-function proxNat() { for (let i = 1; i < 8; i++) { const x = soma(hoje(), i); const t = treinosDoDia(x).find(t => t.tipo === 'natacao'); if (t) return fmtData(x) + ' ' + t.ini; } return '—'; }
+V.natacao = () => menuArte('nat_menu.jpg', 900, 1470, [['#/natacao/hoje', 10.7, 34.3, 78, 10.6, 'Hoje'], ['#/natacao/dicionario', 10.7, 45.9, 78, 10.6, 'Dicionário'], ['#/natacao/estilos', 10.7, 57.4, 78, 10.9, 'Estilos'], ['#/natacao/caderno', 10.7, 69.3, 78, 11.1, 'Caderno do professor'], ['#/natacao/marcos', 10.7, 81.5, 78, 11.2, 'Marcos']], '#/', 'Natação');
+const JN = (t, k, c) => janela('nat_menu.jpg', t, k, '#/natacao', c);
+function natSemana() { const s = semana(hoje()); let n = 0; for (let i = 0; i < 7; i++) if ((S.dias[soma(s, i)] || {}).nat) n++; return n; }
+function proxNat() { for (let i = 0; i < 8; i++) { const x = soma(hoje(), i); const t = treinosDoDia(x).find(t => t.tipo === 'natacao'); if (t) return (i ? fmtData(x) : 'Hoje') + ' às ' + t.ini; } return 'sem aula no cronograma'; }
+V['natacao/hoje'] = () => { const c = S.natacao.caderno, u = c[c.length - 1], n = natSemana();
+  return JN('Hoje', '今日', `<div class="washi"><h3>Próxima aula: ${proxNat()}</h3>
+   ${u ? `<div class="destaque-box">📝 Última correção do professor (${fmtData(u.data)}):<br><b>${esc(u.texto)}</b></div>` : '<p class="peq">Nenhuma correção anotada ainda.</p>'}
+   <h3>Meta da semana: ${n}/2 aulas</h3>${barra(n / 2 * 100)}${chk(D().nat, 'natHoje', '', 'Fui na aula hoje')}</div>`); };
 ACT.natHoje = () => { const d = D(); d.nat = !d.nat; salvar(); rerender(); };
-NV.dicionario = () => `<section class="card"><h2>Dicionário da natação</h2>${DATA.natacao.dicionario.map(([t, s]) => `<div class="verbete"><b>${t}</b><p>${s}</p></div>`).join('')}</section>`;
-NV.estilos = () => DATA.natacao.estilos.map(e => `<details class="card"><summary><b>${e.nome}</b>${e.joelho ? ' <span class="tag p1">⚠️ joelho</span>' : ''}</summary>
-  <p>${e.texto}</p>${e.joelho ? '<p class="alerta">A pernada de peito gira o joelho: combine com o professor por causa da patela. Crawl e costas são os mais tranquilos.</p>' : ''}
-  ${mapa(e.musculos, { vista: mapaVistaForcada })}${nomesMus(e.musculos)}</details>`).join('');
-NV.caderno = () => {
-  const c = P().natacao.caderno;
-  return `<section class="card"><h2>Caderno do professor</h2><textarea id="natTxt" class="campo" placeholder="O que o professor corrigiu ou ensinou hoje?"></textarea><button class="btn" data-act="natAnotar">Salvar</button></section>
-   <section class="card">${c.slice().reverse().map(x => `<div class="item"><small>${fmtData(x.data)}</small><br>${esc(x.texto)}</div>`).join('') || '<p class="peq">Vazio.</p>'}</section>`;
-};
-ACT.natAnotar = () => { const t = document.getElementById('natTxt').value.trim(); if (!t) return; P().natacao.caderno.push({ data: hoje(), texto: t }); salvar(); toast('Anotado'); rerender(); };
-NV.marcos = () => `<section class="card"><h2>Marcos de evolução</h2>${DATA.natacao.marcos.map((m, i) => { const d = P().natacao.marcos[i]; return chk(!!d, 'natMarco', i, m, d ? 'conquistado em ' + fmtData(d) : ''); }).join('')}</section>`;
-ACT.natMarco = i => { const mk = P().natacao.marcos; mk[i] = mk[i] ? null : hoje(); salvar(); rerender(); };
+V['natacao/dicionario'] = () => JN('Dicionário', '辞書', `<div class="washi">${DATA.natacao.dicionario.map(([t, s]) => `<div class="verbete"><b>${t}</b><p>${s}</p></div>`).join('')}</div>`);
+V['natacao/estilos'] = () => JN('Estilos', '泳法', DATA.natacao.estilos.map(e => `<details class="washi"><summary><b>${e.nome}</b>${e.joelho ? ' <span class="tag p1">⚠️ joelho</span>' : ''}</summary><p>${e.texto}</p>
+   ${e.joelho ? '<p class="alerta">A pernada de peito gira o joelho: combine com o professor por causa da patela. Crawl e costas são os mais tranquilos.</p>' : ''}${mapa(e.musculos)}${nomesMus(e.musculos)}</details>`).join(''));
+V['natacao/caderno'] = () => { const c = S.natacao.caderno;
+  return JN('Caderno do Professor', '記録', `<div class="washi"><textarea id="natTxt" class="campo" placeholder="O que o professor corrigiu ou ensinou hoje?"></textarea><button class="btn" data-act="natAnotar">Salvar</button></div>
+   <div class="washi">${c.slice().reverse().map(x => `<div class="item"><span><small>${fmtData(x.data)}</small>${esc(x.texto)}</span></div>`).join('') || '<p class="peq">Vazio.</p>'}</div>`); };
+ACT.natAnotar = () => { const t = document.getElementById('natTxt').value.trim(); if (!t) return; S.natacao.caderno.push({ data: hoje(), texto: t }); salvar(); toast('Anotado'); rerender(); };
+V['natacao/marcos'] = () => JN('Marcos', '進歩', `<div class="washi">${DATA.natacao.marcos.map((m, i) => { const d = S.natacao.marcos[i]; return chk(!!d, 'natMarco', i, m, d ? 'conquistado em ' + fmtData(d) : ''); }).join('')}</div>`);
+ACT.natMarco = i => { const k = S.natacao.marcos; k[i] = k[i] ? null : hoje(); salvar(); rerender(); };
 
-/* ===== YOGA + CHÁS ===== */
-function yogaSemana(p = P()) { const s = semana(hoje()); let n = 0; for (let i = 0; i < 7; i++) if ((p.dias[soma(s, i)] || {}).yoga) n++; return n; }
-function chaDoDia(lista, off = 0) { const n = Math.floor(dt(hoje()).getTime() / 864e5) + off; return lista[n % lista.length]; }
+/* ===== YOGA ===== */
+function yogaSemana() { const s = semana(hoje()); let n = 0; for (let i = 0; i < 7; i++) if ((S.dias[soma(s, i)] || {}).yoga) n++; return n; }
 V.yoga = () => {
-  const d = D(), y = yogaSemana(), C = DATA.chas, s = semana(hoje());
-  const dias = Array.from({ length: 7 }, (_, i) => { const x = soma(s, i); return `<span class="dia ${(P().dias[x] || {}).yoga ? 'on' : ''}">${DIAS[diaSem(x)]}</span>`; }).join('');
-  const noite = d.yoga ? chaDoDia(C.antes_yoga) : chaDoDia(C.dormir);
-  return `<div class="escuro dourado">${topo('Yoga')}
-  <section class="card"><h2>Meta da semana: ${y}/3</h2>${barra(y / 3 * 100)}<div class="dias">${dias}</div>
-   <p class="peq">À noite, antes de dormir. Dias livres. O app lembra você à noite se a meta não estiver completa.</p>
-   ${chk(d.yoga, 'yogaHoje', '', '✅ Concluí o yoga hoje')}</section>
-  <section class="card"><h2>🍵 Chás de hoje</h2>
-   ${chk(d.chaManha, 'cha', 'chaManha', '☀️ Ao acordar: ' + chaDoDia(C.acordar), 'pode ter cafeína')}
-   ${chk(d.chaNoite, 'cha', 'chaNoite', (d.yoga ? '🧘 Antes do yoga: ' : '🌙 Antes de dormir: ') + noite, 'sem cafeína')}
-   <details><summary>Ver todas as opções</summary><p><b>Ao acordar:</b> ${C.acordar.join(', ')}</p><p><b>Antes de dormir:</b> ${C.dormir.join(', ')}</p><p><b>Antes do yoga:</b> ${C.antes_yoga.join(', ')}</p></details>
-   <ul class="peq">${C.regras.map(r => `<li>${r}</li>`).join('')}</ul>
-   <p class="peq"><b>Ciência:</b> camomila tem efeito modesto na qualidade do sono (meta-análise 2024, estudos pequenos e variados); chá-verde reduziu um pouco a glicose em jejum em estudos curtos, sem consenso. O chá é um hábito saudável, não remédio.</p></section>
-  <section class="card"><button class="btn sec" data-act="notifPedir">🔔 Ativar avisos</button><p class="peq">Os avisos aparecem quando o app estiver aberto ou em segundo plano recente; no celular o sistema pode atrasá-los. A tela inicial também mostra os lembretes.</p></section></div>`;
+  const y = yogaSemana(), s = semana(hoje());
+  const dias = Array.from({ length: 7 }, (_, i) => { const x = soma(s, i); return `<span class="dia ${(S.dias[x] || {}).yoga ? 'on' : ''}">${DIAS[diaSem(x)]}</span>`; }).join('');
+  return `<div class="fundo-arte claro" style="background-image:url(img/yoga.jpg)"></div><div class="pg-janela yoga">${topo('Yoga', 'ヨガ')}<div class="conteudo" style="padding-top:52vh">
+   <div class="washi trans"><h2>Meta da semana: ${y}/3</h2>${barra(y / 3 * 100)}<div class="dias">${dias}</div><p class="peq">3 sessões de 1 hora por semana, em qualquer dia.</p>
+    ${chk(D().yoga, 'yogaHoje', '', '✅ Concluí 1h de yoga hoje')}</div>
+   <div class="washi trans">${linksBloco('yoga', 3, 'Vídeos de yoga')}</div></div></div>`;
 };
 ACT.yogaHoje = () => { const d = D(); d.yoga = !d.yoga; salvar(); if (d.yoga) toast(`Yoga ${yogaSemana()}/3 nesta semana`); rerender(); };
-ACT.cha = c => { const d = D(); d[c] = !d[c]; salvar(); rerender(); };
-ACT.notifPedir = async () => {
-  if (!('Notification' in window)) return toast('Este navegador não suporta avisos');
-  const r = await Notification.requestPermission(); toast(r === 'granted' ? 'Avisos ativados' : 'Avisos não permitidos');
-  if (r === 'granted') agendarAvisos();
-};
-function agendarAvisos() {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  clearTimeout(agendarAvisos.t);
-  const agora = new Date(), alvo = new Date(); alvo.setHours(22, 0, 0, 0);
-  if (alvo > agora) agendarAvisos.t = setTimeout(() => {
-    const p = P(); if (yogaSemana() < 3 && !D().yoga) navigator.serviceWorker?.ready.then(r => r.showNotification('Yoga', { body: `Semana: ${yogaSemana()}/3. Que tal hoje antes de dormir? E o chá da noite 🍵`, icon: 'img/icon-192.png' }));
-  }, alvo - agora);
-}
+
+/* ===== partida ===== */
+carregar(); render();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

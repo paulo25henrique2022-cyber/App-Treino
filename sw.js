@@ -1,6 +1,6 @@
-const VERSAO = 'treino-v1.0.0';
-const ARQ = ['./','index.html','style.css','data.js','core.js','karate.js','outros.js','alimentacao.js','compras.js','manifest.json',
- 'img/inicial.jpg','img/karate.jpg','img/mapa.jpg','img/logo.png','img/pergaminho.jpg','img/icon-192.png','img/icon-512.png'];
+const VERSAO = 'treino-v2.0.0';
+const ARQ = ['./','index.html','style.css','data.js','core.js','karate.js','outros.js','telas.js','manifest.json',
+ 'img/inicial.jpg','img/karate_menu.jpg','img/karate_treino.jpg','img/kumite_menu.jpg','img/musc_menu.jpg','img/nat_menu.jpg','img/yoga.jpg','img/calendario.jpg','img/mapa.jpg','img/icon-192.png','img/icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSAO).then(c => c.addAll(ARQ))); self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== VERSAO).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', e => {

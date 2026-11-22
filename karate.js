@@ -1,280 +1,243 @@
 /* ===== Mapa muscular ===== */
-const MUS = Object.fromEntries(DATA.musculos.map(m => [m.id, m]));
-const VISTAS = { frente: [85, 0, 445, 1024], costas: [555, 0, 445, 1024], lado: [1085, 0, 290, 1024] };
-const COR = { 1: '#ff2a2a', 2: '#ff9a1f', 3: '#4da3ff' };
-function vistaDe(ids) { const m = ids.map(i => MUS[i]).find(Boolean); return m ? (m.vista === 'lado' ? 'lado' : m.vista) : 'frente'; }
-function mapa(ids, { vista, todos = false, clic = false } = {}) {
-  vista = vista || vistaDe(ids);
-  const vb = VISTAS[vista];
-  const lista = todos ? DATA.musculos.map(m => m.id) : ids;
-  const els = lista.map(id => {
-    const m = MUS[id]; if (!m) return '';
-    const cor = todos ? COR[m.prioridade] : '#ff2a2a';
-    return m.area.map(([cx, cy, rx, ry]) =>
-      `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${cor}" fill-opacity="${todos ? .45 : .6}" stroke="${cor}" stroke-width="4" ${m.profundo ? 'stroke-dasharray="10 8"' : ''} ${clic ? `data-act="musInfo" data-arg="${id}" style="cursor:pointer"` : ''} class="${todos ? '' : 'pulsa'}"/>`).join('');
-  }).join('');
-  const tabs = Object.keys(VISTAS).map(v => `<button class="${v === vista ? 'on' : ''}" data-act="mapaVista" data-arg="${v}">${v}</button>`).join('');
-  return `<div class="mapa"><div class="mapa-tabs">${tabs}</div><svg viewBox="${vb.join(' ')}"><image href="img/mapa.jpg" x="0" y="0" width="1536" height="1024"/>${els}</svg></div>`;
+const musculos = () => DATA.musculos.concat(S.musculosExtra || []);
+const MUS = id => musculos().find(m => m.id === id);
+const VISTAS = { frente: [88, 0, 420, 1024], costas: [555, 0, 445, 1024], lado: [1085, 0, 290, 1024] };
+const CORP = { 1: '#ff2a2a', 2: '#ff9a1f', 3: '#4da3ff' };
+function mapa(ids, { vista, todos = false, clic = false, id = '' } = {}) {
+  if (!vista) { const m = ids.map(MUS).find(Boolean); vista = m ? m.vista : 'frente'; }
+  const lista = todos ? musculos().map(m => m.id) : ids;
+  const els = lista.map(i => { const m = MUS(i); if (!m) return ''; const cor = todos ? CORP[m.prioridade] : '#ff2a2a';
+    return m.area.map(([cx, cy, rx, ry]) => `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${cor}" fill-opacity="${todos ? .45 : .6}" stroke="${cor}" stroke-width="4" data-id="${m.id}" ${m.profundo ? 'stroke-dasharray="10 8"' : ''} ${clic ? `data-act="musInfo" data-arg="${m.id}"` : ''} class="${todos ? '' : 'pulsa'}"/>`).join(''); }).join('');
+  return `<div class="mapa" ${id ? `id="${id}"` : ''}><div class="mapa-tabs">${Object.keys(VISTAS).map(v => `<button class="${v === vista ? 'on' : ''}" data-act="mapaVista" data-arg="${v}">${v}</button>`).join('')}</div>
+   <svg viewBox="${VISTAS[vista].join(' ')}"><image href="img/mapa.jpg" x="0" y="0" width="1536" height="1024"/>${els}</svg></div>`;
 }
-function nomesMus(ids) {
-  return ids.map(i => MUS[i]).filter(Boolean).map(m => `<span class="tag p${m.prioridade}">${m.nome}${m.profundo ? ' · profundo' : ''}<small>${m.tecnico}</small></span>`).join('');
-}
-let mapaVistaForcada = null;
+function nomesMus(ids) { return ids.map(MUS).filter(Boolean).map(m => `<span class="tag p${m.prioridade}">${esc(m.nome)}${m.profundo ? ' · profundo' : ''}<small>${esc(m.tecnico)}</small></span>`).join(''); }
 ACT.mapaVista = (v, el) => { const m = el.closest('.mapa'); m.querySelector('svg').setAttribute('viewBox', VISTAS[v].join(' ')); m.querySelectorAll('.mapa-tabs button').forEach(b => b.classList.toggle('on', b.dataset.arg === v)); };
 ACT.musInfo = id => {
-  const m = MUS[id];
-  modal(`<h3>${m.nome}</h3><p class="tec">${m.tecnico}${m.profundo ? ' · <b>músculo profundo</b>: fica sob outros músculos; o mapa mostra a região' : ''}</p>
-  <p><b>Prioridade no karatê:</b> ${['', '🔴 essencial', '🟠 importante', '⚪ geral'][m.prioridade]}</p>
-  <p><b>Função no karatê:</b> ${m.funcao_karate}</p><p><b>Como treinar sem encurtar:</b> ${m.como_treinar}</p>`);
+  if (window.musRegistrando) return;
+  const m = MUS(id);
+  modal(`<h3>${esc(m.nome)}</h3><p class="tec">${esc(m.tecnico)}${m.profundo ? ' · <b>músculo profundo</b>: o mapa mostra a região' : ''}</p>
+  <p><b>Prioridade no karatê:</b> ${['', '🔴 essencial', '🟠 importante', '⚪ geral'][m.prioridade]}</p><p><b>Função no karatê:</b> ${esc(m.funcao_karate)}</p><p><b>Como treinar sem encurtar:</b> ${esc(m.como_treinar)}</p>
+  ${m.extra ? `<button class="btn sec" data-act="musDel" data-arg="${m.id}">Apagar este músculo</button>` : ''}`);
 };
-function modal(html) {
-  const m = document.getElementById('modal');
-  m.innerHTML = `<div class="modal-box">${html}<button class="btn" data-act="fecharModal">Fechar</button></div>`;
-  m.classList.add('show');
-}
-ACT.fecharModal = () => document.getElementById('modal').classList.remove('show');
 
-/* ===== Tela inicial ===== */
-const CARDS = [
-  ['karate', 'Karatê', 7.3, 23.8, 41, 14], ['natacao', 'Natação', 51.6, 23.8, 41, 14],
-  ['musculacao', 'Musculação', 7.3, 40, 41, 14], ['yoga', 'Yoga', 51.6, 40, 41, 14],
-  ['alimentacao', 'Alimentação', 22.7, 56, 54.6, 14.4],
-];
-V.inicio = () => {
-  if (S.novo) return V.boasvindas();
-  const avisos = [];
-  const h = new Date().getHours();
-  if (!S.backup || hoje() > soma(S.backup, 7)) avisos.push(`<a href="#/config" class="aviso">💾 Faça o backup semanal dos seus dados</a>`);
-  const pes = P().pesagens; if (!pes.length || hoje() >= soma(pes[pes.length - 1].data, 14)) avisos.push(`<a href="#/alimentacao/progresso" class="aviso">⚖️ Hora de registrar o peso (a cada 2 semanas)</a>`);
-  const y = yogaSemana(); if (h >= 20 && y < 3 && !D().yoga) avisos.push(`<a href="#/yoga" class="aviso">🧘 Yoga da semana: ${y}/3 — que tal hoje antes de dormir?</a>`);
-  if (h >= 20 && !D().chaNoite) avisos.push(`<a href="#/yoga" class="aviso">🍵 Chá antes de dormir</a>`);
-  if (h < 12 && !D().chaManha) avisos.push(`<a href="#/yoga" class="aviso">🍵 Chá ao acordar</a>`);
-  const tr = treinosDoDia(hoje()).map(t => NOMES_TREINO[t.tipo] + ' ' + t.ini).join(' · ') || 'Descanso';
-  return `<div class="inicio">
-   <div class="arte-wrap"><img src="img/inicial.jpg" class="arte" alt="">
-   <button class="perfil-btn flut" data-act="trocarPerfil">👤 ${esc(P().nome)}</button>
-   <a href="#/config" class="cfg-btn flut">⚙️</a>
-   ${CARDS.map(([r, n, x, y, w, hh]) => `<a href="#/${r}" class="hot" style="left:${x}%;top:${y}%;width:${w}%;height:${hh}%"><span>${n}</span></a>`).join('')}</div>
-   <div class="hoje-box"><b>Hoje · ${fmtData(hoje())}</b><br>${tr}
-   ${avisos.join('')}<a href="#/compras" class="aviso verde">🛒 Supermercado</a></div>
-  </div>`;
-};
-V.boasvindas = () => `<div class="pagina"><h1>Bem-vindo ao seu App de Treino</h1>
- <p>Os dados ficam guardados <b>só neste celular</b>. Quem é você neste aparelho?</p>
- <button class="btn grande" data-act="primeiro" data-arg="ele">Sou ele</button>
- <button class="btn grande" data-act="primeiro" data-arg="ela">Sou ela</button>
- <p class="peq">Depois confira seus dados em ⚙️ Configurações. Tem um backup? Importe por lá.</p></div>`;
-ACT.primeiro = q => { S.ativo = q; delete S.novo; salvar(); location.hash = '#/config'; render(); };
-
-/* ===== KARATÊ ===== */
-const KAR_ABAS = [['treino', 'Treino'], ['kata', 'Kata semanal'], ['dominio', 'Domínio'], ['kumite', 'Kumite'], ['dicionario', 'Dicionário'], ['prova', 'Prova mensal'], ['along', 'Alongamentos']];
-function katas() {
-  const base = DATA.katas.map(k => ({ ...k, movimentos: S.katasEdit[k.nome] ?? k.movimentos }));
-  return base.concat(S.katasExtra);
-}
+/* ===== Katas (Registro) ===== */
+function katas() { return DATA.katas.map(k => ({ ...k, movimentos: S.katasEdit[k.nome] ?? k.movimentos })).concat(S.katasExtra); }
 const kataPorNome = n => katas().find(k => k.nome === n);
-function kpag(sub, corpo) { return `<div class="karate">${topo('Karatê')}<div class="kar-cab"></div><div class="madeira">${abas('karate', KAR_ABAS, sub)}${corpo}</div></div>`; }
-V.karate = (sub = 'treino') => kpag(sub, (KV[sub] || KV.treino)());
-const KV = {};
-
-/* -- treino do dia -- */
-KV.treino = () => {
-  const d = D(), p = P();
-  const ehDia = treinosDoDia(hoje()).some(t => t.tipo === 'karate');
-  const ks = p.kataSem, dm = p.dominio, meta = dm ? metaDominio(dm) : null;
-  const k = semanaKumite();
-  return `<section class="card"><h2>${fmtData(hoje())} ${ehDia ? '· dia de karatê 🥋' : '· (hoje não é dia de karatê)'}</h2>
-  ${chk(d.alA, 'kTog', 'alA', '1. Alongamento antes (dinâmico)', '<a href="#/karate/along">ver os 9 movimentos</a>')}
-  <div class="item"><b>2. Kata semanal${ks ? ': ' + esc(ks.kata) : ''}</b>${ks ? contador(d.kata || 0, 10, 'kKata', 'x') : ' — <a href="#/karate/kata">escolher o kata</a>'}</div>
-  <div class="item"><b>3. Domínio do Kata</b> ${dm ? `${esc(dm.kata)} · meta de hoje: <b>${meta.feitosHoje}/${meta.metaHoje} blocos</b> <a href="#/karate/dominio">abrir</a>` : '<a href="#/karate/dominio">escolher o kata</a>'}</div>
-  <div class="item"><b>4. Kumite da semana</b> <a href="#/karate/kumite">${['sanbon', 'kihon', 'jiyu'].map(x => k[x] || 0).join(' · ')} /10 · livre: ${k.lutei ? '✓' : '—'}</a></div>
-  ${chk(d.alD, 'kTog', 'alD', '5. Alongamento depois (estático)', '<a href="#/karate/along">13 alongamentos com cronômetro</a>')}
-  </section>`;
-};
-ACT.kTog = c => { const d = D(); d[c] = !d[c]; salvar(); rerender(); };
-ACT.kKata = a => { const d = D(); d.kata = Math.max(0, Math.min(10, (d.kata || 0) + Number(a.split('|')[1]))); if (d.kata === 10) toast('10 execuções! Oss!'); salvar(); rerender(); };
-
-/* -- kata semanal -- */
-function kataSemStatus(p = P()) {
-  const ks = p.kataSem; if (!ks) return null;
-  const sem = semana(hoje());
-  const dias = Object.entries(p.dias).filter(([dd, v]) => semana(dd) === sem && (v.kata || 0) >= 10).length;
-  return { dias: Math.min(3, dias), sem };
-}
-KV.kata = () => {
-  const p = P(), ks = p.kataSem, st = kataSemStatus();
-  let h = `<section class="card"><h2>Kata semanal</h2><p>10 execuções por treino (seg, qua, sex). A semana conclui com os 3 dias. O kata fica <b>travado</b> até concluir uma semana completa.</p>`;
-  if (ks) {
-    h += `<p class="destaque">${esc(ks.kata)} ${kataPorNome(ks.kata)?.kanji || ''}</p><p>Esta semana: <b>${st.dias}/3 dias</b></p>${barra(st.dias / 3 * 100)}
-     <p>Semanas concluídas com este kata: ${ks.concluidas.length}</p>`;
-    if (st.dias >= 3 && !ks.concluidas.includes(st.sem)) { ks.concluidas.push(st.sem); salvar(); }
-    h += ks.concluidas.length ? `<button class="btn" data-act="kataTrocar">Concluído ✓ · escolher outro kata</button>` : `<p class="peq">🔒 Trocar só depois de 1 semana completa.</p>`;
-  } else h += selKata('kataEscolher');
-  return h + `</section><section class="card"><h3>Lista de katas</h3><p class="peq">Número de movimentos editável (toque para corrigir). ⚠️ = fontes divergem.</p>${listaKatas()}
-  <button class="btn sec" data-act="kataNovo">+ Adicionar kata</button></section>`;
-};
-function selKata(act) { return `<label>Escolha o kata<select data-chg="${act}"><option value="">—</option>${katas().map(k => `<option>${esc(k.nome)}</option>`).join('')}</select></label>`; }
-function listaKatas() {
-  return `<table class="tab">${katas().map(k => `<tr><td>${esc(k.nome)} <small>${k.kanji || ''}</small>${k.divergencia ? ` <span title="${k.divergencia}">⚠️</span>` : ''}</td><td><button class="lnk" data-act="kataMov" data-arg="${esc(k.nome)}">${k.movimentos ?? '<i>preencher</i>'}</button></td></tr>`).join('')}</table>`;
-}
-ACT.kataEscolher = (_, el) => { if (!el.value) return; P().kataSem = { kata: el.value, inicio: hoje(), concluidas: [] }; salvar(); rerender(); };
-ACT.kataTrocar = () => { P().kataSem = null; salvar(); rerender(); };
-ACT.kataMov = n => {
-  const k = kataPorNome(n); const v = prompt(`Movimentos de ${n}${k.divergencia ? ' (' + k.divergencia + ')' : ''}:`, k.movimentos ?? '');
-  if (v === null) return; const x = parseInt(v); if (!(x > 0)) return toast('Número inválido');
+function selKata(act, atual) { return `<select data-chg="${act}"><option value="">— escolha o kata —</option>${katas().map(k => `<option ${k.nome === atual ? 'selected' : ''}>${esc(k.nome)}</option>`).join('')}</select>`; }
+function pedirMov(n) {
+  const k = kataPorNome(n); const v = prompt(`Movimentos de ${n}${k.divergencia ? ' (' + k.divergencia + ')' : ''}:`, k.movimentos ?? ''); if (v === null) return false;
+  const x = parseInt(v); if (!(x > 0)) { toast('Número inválido'); return false; }
   const ex = S.katasExtra.find(e => e.nome === n); if (ex) ex.movimentos = x; else S.katasEdit[n] = x;
-  const dm = P().dominio; if (dm && dm.kata === n) ajustarBlocos(dm, x);
+  if (S.kp && S.kp.kata === n) ajustarBlocos(x);
+  salvar(); return true;
+}
+
+/* ===== Menus em arte ===== */
+V.karate = () => menuArte('karate_menu.jpg', 900, 1599, [['#/karate/treino', 13.6, 49.2, 72.7, 10.9, 'Treino'], ['#/karate/dicionario', 13.6, 63.1, 72.7, 11.1, 'Dicionário'], ['#/karate/resultado', 13.6, 77.6, 72.7, 11.5, 'Resultado mensal']], '#/', 'Karatê');
+const TREINO_SUB = { memoria: () => KMemoria(), polimento: () => KPolimento(), along: () => KAlong(), registro: () => KRegistro() };
+V['karate/treino'] = (sub) => TREINO_SUB[sub] ? TREINO_SUB[sub]() : menuArte('karate_treino.jpg', 900, 1599,
+  [['#/karate/treino/memoria', 18.5, 46.7, 63, 8.9, 'Kata Memória'], ['#/karate/treino/polimento', 18.5, 56.4, 63, 9, 'Kata Polimento'], ['#/karate/treino/kumite', 18.5, 66.2, 63, 9.2, 'Kumite'], ['#/karate/treino/along', 18.5, 76.2, 63, 9.5, 'Alongamentos'], ['#/karate/treino/registro', 18.5, 86.5, 63, 9.2, 'Registro de Kata']], '#/karate', 'Treino');
+const JT = (t, k, c) => janela('karate_treino.jpg', t, k, '#/karate/treino', c);
+
+/* ===== Registro de Kata ===== */
+function KRegistro() {
+  return JT('Registro de Kata', '記録', `<div class="washi"><p class="peq">Banco de dados dos katas. O número de movimentos é usado automaticamente no Kata Memória e no Kata Polimento. ⚠️ = fontes divergem.</p>
+   <button class="btn" data-act="kataNovo">+ Adicionar kata</button></div>
+   ${katas().map(k => `<details class="washi kata-reg"><summary><span><b>${esc(k.nome)}</b> <span class="kjp">${esc(k.kanji || '')}</span>${k.divergencia ? ' <span title="' + esc(k.divergencia) + '">⚠️</span>' : ''}</span><span class="movs">${k.movimentos ?? '—'} mov.</span></summary>
+     <button class="btn sec" data-act="kataMov" data-arg="${esc(k.nome)}">✏️ Editar movimentos</button>${k.divergencia ? `<small>Outra fonte: ${esc(k.divergencia.replace('outra fonte: ', ''))}</small>` : ''}
+     ${linksBloco('kata:' + k.nome, 3)}
+     ${k.grupo === 'Extra' ? `<button class="lnk" data-act="kataDel" data-arg="${esc(k.nome)}">apagar kata</button>` : ''}</details>`).join('')}`);
+}
+ACT.kataMov = n => { if (pedirMov(n)) rerender(); };
+ACT.kataNovo = () => { const n = (prompt('Nome do kata:') || '').trim(); if (!n) return; if (kataPorNome(n)) return toast('Já existe');
+  const kj = prompt('Kanji (opcional):') || ''; const m = parseInt(prompt('Número de movimentos (pode deixar vazio):'));
+  S.katasExtra.push({ nome: n, kanji: kj, movimentos: m > 0 ? m : null, grupo: 'Extra' }); salvar(); rerender(); };
+ACT.kataDel = n => { if (!confirm('Apagar ' + n + '?')) return; S.katasExtra = S.katasExtra.filter(k => k.nome !== n); salvar(); rerender(); };
+
+/* ===== Kata Memória ===== */
+const kmTotal = km => Object.values(km.log).reduce((a, b) => a + b, 0);
+function KMemoria() {
+  const km = S.km, t = km ? kmTotal(km) : 0, p = t / 45 * 100, hj = km ? km.log[hoje()] || 0 : 0;
+  return JT('Kata Memória', '型記憶', `<div class="washi"><p class="peq">1 kata por vez · de 1 a 15 execuções por dia · meta de 45 execuções, sem prazo. Trocar de kata antes de 100% apaga o progresso.</p>
+   ${selKata('kmEscolher', km && km.kata)}
+   ${km ? `<div class="kata-nome">${esc(km.kata)} <span class="kjp">${esc(kataPorNome(km.kata)?.kanji || '')}</span></div>${barra(p)}
+     <p><b>${t}/45</b> execuções · ${nf(p)}%</p>
+     ${km.concluido ? `<p class="ok">🏆 Concluído em ${fmtData(km.concluido)}! Escolha o próximo kata.</p>` : `<div class="item"><b>Hoje</b>${contador(hj, 15, 'kmCont', 'x')}</div>`}` : ''}
+   </div>${km ? linksBloco('kata:' + km.kata, 3, 'Vídeos deste kata') : ''}
+   <div class="washi"><h3>Katas concluídos</h3>${S.kmConcl.length ? S.kmConcl.slice().reverse().map(c => `<div class="item">${esc(c.kata)}<small>${fmtData(c.data)}</small></div>`).join('') : '<p class="peq">Nenhum ainda.</p>'}</div>
+   <div class="rodape"><button class="btn perigo" data-act="kmReset">Resetar todos os progressos</button></div>`);
+}
+ACT.kmEscolher = (_, el) => {
+  const n = el.value; if (!n) return; const km = S.km;
+  if (km && !km.concluido && kmTotal(km) > 0 && km.kata !== n && !confirm(`Trocar de kata apaga o progresso de ${km.kata} (${kmTotal(km)}/45). Continuar?`)) return rerender();
+  S.km = { kata: n, log: {} }; salvar(); rerender();
+};
+ACT.kmCont = a => {
+  const km = S.km, d = +a.split('|')[1], h = hoje(), v = (km.log[h] || 0) + d;
+  if (v < 0) return; if (v > 15) return toast('Máximo de 15 por dia'); if (d > 0 && kmTotal(km) >= 45) return;
+  km.log[h] = v; if (!v) delete km.log[h];
+  if (kmTotal(km) >= 45 && !km.concluido) { km.concluido = h; S.kmConcl.push({ kata: km.kata, data: h, log: { ...km.log } }); beep(2); toast('Kata memorizado! 100%'); }
   salvar(); rerender();
 };
-ACT.kataNovo = () => {
-  const n = prompt('Nome do kata:'); if (!n) return;
-  const kj = prompt('Kanji (opcional):') || ''; const m = parseInt(prompt('Número de movimentos (pode deixar vazio):'));
-  S.katasExtra.push({ nome: n, kanji: kj, movimentos: m > 0 ? m : null, grupo: 'Extra' }); salvar(); rerender();
-};
+ACT.kmReset = () => { if (!confirm('Apagar todo o progresso do Kata Memória, incluindo os concluídos?')) return; S.km = null; S.kmConcl = []; salvar(); rerender(); };
 
-/* -- domínio do kata -- */
-function ajustarBlocos(dm, mov) {
-  dm.mov = mov; const n = Math.ceil(mov / 2);
-  while (dm.blocos.length < n) dm.blocos.push({ reps: 0, ex: Array(10).fill(false), feito: null });
-  dm.blocos.length = n;
+/* ===== Kata Polimento ===== */
+function ajustarBlocos(mov) { const kp = S.kp; kp.mov = mov; const n = Math.ceil(mov / 2); while (kp.blocos.length < n) kp.blocos.push({ r: 0, dias: {} }); kp.blocos.length = n; }
+const kpReps = kp => kp.blocos.reduce((a, b) => a + b.r, 0);
+function kpAtual(kp) { return kp.blocos.findIndex(b => b.r < 20); }
+function KPolimento() {
+  const kp = S.kp;
+  let h = `<div class="washi"><p class="peq">Blocos de 2 movimentos · 1 bloco por dia · 20 repetições por bloco. O bloco incompleto continua em outro dia. Sem prazo. Trocar de kata antes de 100% apaga o progresso.</p>${selKata('kpEscolher', kp && kp.kata)}`;
+  if (kp && !kp.mov) h += `<p>${esc(kp.kata)} está sem número de movimentos.</p><button class="btn" data-act="kataMov" data-arg="${esc(kp.kata)}">Preencher movimentos</button>`;
+  if (kp && kp.mov) {
+    const tot = kp.blocos.length * 20, r = kpReps(kp), p = r / tot * 100, i = kpAtual(kp), b = kp.blocos[i];
+    const outroHoje = kp.blocos.some((x, j) => j !== i && x.dias[hoje()]);
+    h += `<div class="kata-nome">${esc(kp.kata)} <span class="kjp">${esc(kataPorNome(kp.kata)?.kanji || '')}</span></div>${barra(p)}
+     <p><b>${nf(p)}%</b> · ${kp.blocos.filter(x => x.r >= 20).length}/${kp.blocos.length} blocos · ${kp.mov} movimentos</p>`;
+    if (kp.concluido) h += `<p class="ok">🏆 Kata polido em ${fmtData(kp.concluido)}! Escolha o próximo.</p>`;
+    else if (b) { const a = i * 2 + 1, z = Math.min(kp.mov, a + 1);
+      h += `<div class="bloco-atual"><b>Bloco ${i + 1}</b> · movimentos ${a}${z > a ? '–' + z : ''}${b.r && !b.dias[hoje()] ? ' <small>(continuando)</small>' : ''}
+       ${outroHoje && !b.r ? '<p class="peq">✅ Bloco de hoje concluído. O próximo começa no próximo treino.</p>' : `<div class="item"><b>Repetições</b>${contador(b.r, 20, 'kpCont', i)}</div>`}</div>`; }
+  }
+  h += '</div>';
+  if (kp && kp.mov) h += `<details class="washi"><summary><b>Todos os blocos</b></summary>${kp.blocos.map((b, j) => `<div class="item">Bloco ${j + 1} · mov. ${j * 2 + 1}${j * 2 + 2 <= kp.mov ? '–' + (j * 2 + 2) : ''}<span>${b.r >= 20 ? '✅' : b.r + '/20'}</span></div>`).join('')}</details>`;
+  if (kp) h += linksBloco('kata:' + kp.kata, 3, 'Vídeos deste kata');
+  h += `<div class="washi"><h3>Katas polidos</h3>${S.kpConcl.length ? S.kpConcl.slice().reverse().map(c => `<div class="item">${esc(c.kata)}<small>${fmtData(c.data)}</small></div>`).join('') : '<p class="peq">Nenhum ainda.</p>'}</div>
+   <div class="rodape"><button class="btn perigo" data-act="kpReset">Resetar todos os progressos</button></div>`;
+  return JT('Kata Polimento', '型研磨', h);
 }
-function diasKarateAte(de, ate, p = P()) {
-  const dk = (p.treinos.find(t => t.tipo === 'karate') || { dias: [1, 3, 5] }).dias; let n = 0;
-  for (let x = de; x <= ate; x = soma(x, 1)) if (dk.includes(diaSem(x))) n++;
-  return n;
-}
-function metaDominio(dm) {
-  const prazo = soma(dm.inicio, 30), h = hoje();
-  const feitos = dm.blocos.filter(b => b.feito).length, total = dm.blocos.length;
-  const feitosHoje = dm.blocos.filter(b => b.feito === h).length;
-  const restAntes = total - feitos + feitosHoje;
-  const dias = Math.max(1, diasKarateAte(h, prazo));
-  return { prazo, feitos, total, feitosHoje, metaHoje: Math.min(restAntes, Math.ceil(restAntes / dias)), vencido: h > prazo && feitos < total, pct: total ? feitos / total * 100 : 0 };
-}
-KV.dominio = () => {
-  const p = P(), dm = p.dominio;
-  let h = `<section class="card"><h2>Domínio do Kata</h2><p>Blocos de 2 movimentos. Cada bloco: <b>20 repetições</b> + check dos <b>10 exercícios com elástico</b>. Meta: 100% em até 1 mês. Treinar a mais é sempre permitido.</p>`;
-  if (!dm) return h + selKata('domEscolher') + '</section>' + exsElastico();
-  if (!dm.mov) return h + `<p>${esc(dm.kata)} está sem número de movimentos.</p><button class="btn" data-act="kataMov" data-arg="${esc(dm.kata)}">Preencher movimentos</button></section>`;
-  const m = metaDominio(dm);
-  h += `<p class="destaque">${esc(dm.kata)} · ${dm.mov} movimentos · ${m.total} blocos</p>${barra(m.pct)}
-   <p><b>${nf(m.pct)}%</b> · ${m.feitos}/${m.total} blocos · prazo ${fmtData(m.prazo)}</p>
-   <p>Meta de hoje: <b>${m.feitosHoje}/${m.metaHoje} blocos</b> (recalculada automaticamente)</p>
-   ${m.vencido ? '<p class="alerta">⏰ Prazo vencido — continue até 100%. O kata fica travado até concluir.</p>' : ''}
-   ${m.pct >= 100 ? '<p class="ok">🏆 Kata dominado!</p><button class="btn" data-act="domNovo">Escolher outro kata</button>' : '<p class="peq">🔒 Kata travado até 100%.</p>'}</section>`;
-  const nomes = p.exsElastico;
-  h += dm.blocos.map((b, i) => {
-    const a = i * 2 + 1, z = Math.min(dm.mov, a + 1);
-    return `<details class="card bloco ${b.feito ? 'feito' : ''}"><summary>Bloco ${i + 1} · mov. ${a}${z > a ? '–' + z : ''} ${b.feito ? '✓ ' + fmtData(b.feito) : `· ${b.reps}/20`}</summary>
-     <div class="item">Repetições ${contador(b.reps, 20, 'domRep', i)}</div>
-     ${b.ex.map((e, j) => chk(e, 'domEx', i + '|' + j, nomes[j] || `Exercício ${j + 1}`)).join('')}
-    </details>`;
-  }).join('');
-  return h + exsElastico();
+ACT.kpEscolher = (_, el) => {
+  const n = el.value; if (!n) return; const kp = S.kp;
+  if (kp && !kp.concluido && kp.blocos && kpReps(kp) > 0 && kp.kata !== n && !confirm(`Trocar de kata apaga o progresso de ${kp.kata}. Continuar?`)) return rerender();
+  S.kp = { kata: n, mov: null, blocos: [] }; const k = kataPorNome(n); if (k.movimentos) ajustarBlocos(k.movimentos); salvar(); rerender();
 };
-function exsElastico() {
-  return `<section class="card"><h3>Meus 10 exercícios com elástico</h3><p class="peq">Você escolhe; o app não sugere.</p>
-  ${P().exsElastico.map((e, i) => `<input class="campo" placeholder="Exercício ${i + 1}" value="${esc(e)}" data-chg="exNome" data-arg="${i}">`).join('')}</section>`;
-}
-ACT.exNome = (i, el) => { P().exsElastico[i] = el.value; salvar(); };
-ACT.domEscolher = (_, el) => {
-  if (!el.value) return; const k = kataPorNome(el.value);
-  const dm = { kata: el.value, inicio: hoje(), mov: null, blocos: [] }; if (k.movimentos) ajustarBlocos(dm, k.movimentos);
-  P().dominio = dm; salvar(); rerender();
+ACT.kpCont = a => {
+  const [i, d] = a.split('|').map(Number), kp = S.kp, b = kp.blocos[i], h = hoje();
+  const v = b.r + d; if (v < 0 || v > 20) return; if (d < 0 && !(b.dias[h] > 0)) return toast('Só dá para desfazer repetições de hoje');
+  b.r = v; b.dias[h] = (b.dias[h] || 0) + d; if (!b.dias[h]) delete b.dias[h];
+  if (b.r === 20) toast(`Bloco ${i + 1} concluído!`);
+  if (kp.blocos.every(x => x.r >= 20) && !kp.concluido) { kp.concluido = h; S.kpConcl.push({ kata: kp.kata, data: h, reps: kp.blocos.map(x => x.dias) }); beep(2); toast('Kata polido! 100%'); }
+  salvar(); rerender();
 };
-ACT.domNovo = () => { P().dominio = null; salvar(); rerender(); };
-function domCheckFeito(b) { const ok = b.reps >= 20 && b.ex.every(Boolean); if (ok && !b.feito) { b.feito = hoje(); toast('Bloco concluído!'); } if (!ok) b.feito = null; }
-ACT.domRep = a => { const [i, d] = a.split('|').map(Number); const b = P().dominio.blocos[i]; b.reps = Math.max(0, Math.min(20, b.reps + d)); domCheckFeito(b); salvar(); rerender(); };
-ACT.domEx = a => { const [i, j] = a.split('|').map(Number); const b = P().dominio.blocos[i]; b.ex[j] = !b.ex[j]; domCheckFeito(b); salvar(); rerender(); };
+ACT.kpReset = () => { if (!confirm('Apagar todo o progresso do Kata Polimento, incluindo os concluídos?')) return; S.kp = null; S.kpConcl = []; salvar(); rerender(); };
 
-/* -- kumite -- */
-function semanaKumite(p = P()) { const s = semana(hoje()); return p.kumite[s] || (p.kumite[s] = {}); }
-KV.kumite = () => {
-  const k = semanaKumite();
-  const c = (id, n) => `<div class="item"><b>${n}</b>${contador(k[id] || 0, 10, 'kuCont', id)}</div>`;
-  return `<section class="card"><h2>Kumite · semana de ${fmtData(semana(hoje()))}</h2><p class="peq">1× por semana cada. Zera toda segunda.</p>
-   ${c('sanbon', 'Sanbon kumite')}${c('kihon', 'Kihon ippon kumite')}${c('jiyu', 'Jiyu ippon kumite')}
-   <h3>Kumite livre</h3>${chk(k.lutei, 'kuLutei', '', 'Lutei com adversário aleatório')}
-   ${c('explosao', 'Explosão')}${c('reflexo', 'Reflexo')}${c('velocidade', 'Velocidade')}</section>
-   <section class="card peq"><b>Base de pesquisa:</b> pliometria melhora força e potência em artes marciais; testes simples de reação a luz/som não diferenciam lutadores; treino de antecipação em vídeo (oclusão temporal) tem efeito grande.</section>`;
+/* ===== Kumite ===== */
+const KUM = { sanbon: ['Sanbon Kumite', '三本組手'], kihon: ['Kihon Ippon', '基本一本'], jiyuippon: ['Jiyu Ippon', '自由一本'], jiyukumite: ['Jiyu Kumite', '自由組手'] };
+const JIYU = [['explosao', 'Treino de explosão'], ['velocidade', 'Treino de velocidade'], ['reflexo', 'Treino de reflexo'], ['movimentacao', 'Treino de movimentação']];
+function kumSem(s = semana(hoje())) { return S.kumite[s] || (S.kumite[s] = {}); }
+V['karate/treino/kumite'] = sub => {
+  if (!KUM[sub]) return menuArte('kumite_menu.jpg', 900, 1599, [['#/karate/treino/kumite/sanbon', 12.8, 46.5, 74.6, 10.3, 'Sanbon'], ['#/karate/treino/kumite/kihon', 12.8, 57.9, 74.6, 10.3, 'Kihon Ippon'], ['#/karate/treino/kumite/jiyuippon', 12.8, 69.3, 74.6, 10.6, 'Jiyu Ippon'], ['#/karate/treino/kumite/jiyukumite', 12.8, 81, 74.6, 10.8, 'Jiyu Kumite']], '#/karate/treino', 'Kumite');
+  const k = kumSem(), [n, kj] = KUM[sub];
+  let c = `<div class="washi"><p class="peq">Semana de ${fmtData(semana(hoje()))} · meta de 10 por semana · zera toda segunda.</p>`;
+  if (sub === 'jiyukumite') c += '</div>' + JIYU.map(([id, nm]) => `<div class="washi"><div class="item"><b>${nm}</b>${contador(k[id] || 0, 10, 'kuCont', id)}</div>${barra((k[id] || 0) * 10)}${linksBloco('kum:' + id, 3)}</div>`).join('');
+  else c += `<div class="item"><b>${n}</b>${contador(k[sub] || 0, 10, 'kuCont', sub)}</div>${barra((k[sub] || 0) * 10)}</div>${linksBloco('kum:' + sub, 3)}`;
+  return janela('kumite_menu.jpg', n, kj, '#/karate/treino/kumite', c);
 };
-ACT.kuCont = a => { const [id, d] = a.split('|'); const k = semanaKumite(); k[id] = Math.max(0, Math.min(10, (k[id] || 0) + Number(d))); salvar(); rerender(); };
-ACT.kuLutei = () => { const k = semanaKumite(); k.lutei = !k.lutei; salvar(); rerender(); };
+ACT.kuCont = a => { const [id, d] = a.split('|'); const k = kumSem(); const v = (k[id] || 0) + Number(d); if (v < 0 || v > 10) return; k[id] = v; salvar(); rerender(); };
 
-/* -- dicionário -- */
+/* ===== Alongamentos (sessão diária, 13 estáticos) ===== */
+let timer = null;
+function KAlong() {
+  const A = DATA.alongamentos.estaticos, d = D(), al = d.alongDia || {}, n = A.filter((_, i) => al[i]).length;
+  return JT('Alongamentos', '柔軟', `<div class="washi"><p>Sessão de hoje: <b>${n}/13</b></p>${barra(n / 13 * 100)}<p class="peq">1 sessão por dia, em qualquer horário · 20–30 s por lado · os checks zeram à meia-noite.</p></div>
+   ${A.map((a, i) => `<div class="washi along">${chk(al[i], 'alItem', i, esc(a.nome), a.tempo_s + ' s' + (a.nunca_pular ? ' · <b class="alerta">nunca pular</b>' : ''))}
+     <p>${esc(a.como)}</p><button class="btn sec" data-act="alTimer" data-arg="30">⏱️ 30 s</button>
+     <details><summary class="lnk">ver músculo alongado</summary>${mapa(a.musculos)}<div>${nomesMus(a.musculos)}</div></details>${linksBloco('al:' + i, 2)}</div>`).join('')}`);
+}
+ACT.alItem = i => { const d = D(); d.alongDia = d.alongDia || {}; d.alongDia[i] = !d.alongDia[i]; salvar(); rerender(); };
+ACT.alTimer = s => {
+  clearInterval(timer); let t = +s; const el = document.getElementById('cron');
+  const show = () => { el.innerHTML = `<b>${t}s</b> <button class="lnk" data-act="alPara">parar</button>`; };
+  show(); timer = setInterval(() => { t--; show(); if (t <= 0) { clearInterval(timer); timer = null; beep(); el.innerHTML = '🔔 Tempo!'; setTimeout(() => { if (!timer) el.innerHTML = ''; }, 4000); } }, 1000);
+};
+ACT.alPara = () => { clearInterval(timer); timer = null; document.getElementById('cron').innerHTML = ''; };
+
+/* ===== Dicionário ===== */
 let dicBusca = '';
-const norm = s => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[ōō]/g, 'o').replace(/ū/g, 'u');
-KV.dicionario = () => {
+const norm = s => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+V['karate/dicionario'] = () => {
   const q = norm(dicBusca.trim());
   const res = q ? DATA.dicionario.filter(e => [e.pt, e.romaji, e.jp, e.kana].some(x => norm(x).includes(q))) : [];
   const cats = [...new Set(DATA.dicionario.map(e => e.categoria))];
-  let h = `<section class="card"><h2>Dicionário</h2><input id="busca" class="campo" placeholder="Digite em português ou japonês…" value="${esc(dicBusca)}" data-chg="dicBuscar">
-   <button class="btn" data-act="dicIr">Buscar</button>`;
-  if (q && !res.length) {
-    h += `<p>Não encontrei “${esc(dicBusca)}”.</p><button class="btn sec" data-act="dicPend">Enviar para a lista de pendentes</button>`;
-  }
-  h += res.map(verbete).join('') + '</section>';
-  if (!q) h += cats.map(c => `<details class="card"><summary>${c} (${DATA.dicionario.filter(e => e.categoria === c).length})</summary>${DATA.dicionario.filter(e => e.categoria === c).map(verbete).join('')}</details>`).join('');
-  if (S.pendentes.length) h += `<section class="card"><h3>Palavras pendentes</h3><p class="peq">Peça ao Claude para acrescentar: use “Copiar para a IA” em ⚙️.</p>${S.pendentes.map(x => `<span class="tag">${esc(x)}</span>`).join('')}</section>`;
-  return h;
+  let h = `<div class="washi"><input id="busca" class="campo" placeholder="Digite em português ou japonês…" value="${esc(dicBusca)}" data-chg="dicBuscar"><button class="btn" data-act="dicIr">Buscar</button>`;
+  if (q && !res.length) h += `<p>Não encontrei “${esc(dicBusca)}”.</p><button class="btn sec" data-act="dicPend">Enviar para a lista de pendentes</button>`;
+  h += res.map(verbete).join('') + '</div>';
+  if (!q) h += cats.map(c => `<details class="washi"><summary><b>${c}</b> (${DATA.dicionario.filter(e => e.categoria === c).length})</summary>${DATA.dicionario.filter(e => e.categoria === c).map(verbete).join('')}</details>`).join('');
+  if (S.pendentes.length) h += `<div class="washi"><h3>Palavras pendentes</h3><p class="peq">Peça ao Claude para acrescentar.</p>${S.pendentes.map(x => `<span class="tag">${esc(x)}</span>`).join('')}</div>`;
+  return janela('karate_menu.jpg', 'Dicionário', '辞書', '#/karate', h);
 };
 function verbete(e) {
-  return `<div class="verbete"><div class="vt"><span class="jp">${e.jp}</span> <span class="kana">${e.kana}</span></div>
-  <b>${esc(e.pt)}</b> · <i>${e.romaji}</i> · 🔊 ${e.leitura}
-  <div class="kanjis">${e.kanji.map(([k, s]) => `<span><b>${k}</b> ${s}</span>`).join('')}</div>
-  <p>${e.texto}</p>${e.aviso ? `<p class="aviso-f">⚠️ ${e.aviso}</p>` : ''}</div>`;
+  return `<div class="verbete"><div><span class="jp">${e.jp}</span> <span class="kana">${e.kana}</span></div><b>${esc(e.pt)}</b> · <i>${e.romaji}</i> · 🔊 ${e.leitura}
+   <div class="kanjis">${e.kanji.map(([k, s]) => `<span><b>${k}</b> ${s}</span>`).join('')}</div><p>${e.texto}</p>${e.aviso ? `<p class="aviso-f">⚠️ ${e.aviso}</p>` : ''}</div>`;
 }
 ACT.dicBuscar = (_, el) => { dicBusca = el.value; rerender(); };
 ACT.dicIr = () => { dicBusca = document.getElementById('busca').value; rerender(); };
 ACT.dicPend = () => { if (!S.pendentes.includes(dicBusca)) S.pendentes.push(dicBusca); salvar(); toast('Adicionada aos pendentes'); rerender(); };
 
-/* -- prova mensal -- */
-function avaliarMes(m, p = P()) {
-  const ini = m + '-01', fimMes = soma(soma(ini, 32).slice(0, 7) + '-01', -1), ate = hoje() < fimMes ? hoje() : fimMes;
-  const dias = []; let prev = 0, feito = 0; const falhas = [];
-  for (let x = ini; x <= ate; x = soma(x, 1)) {
-    if (!treinosDoDia(x, p).some(t => t.tipo === 'karate')) continue;
-    const d = p.dias[x] || {}; const dm = p.dominio;
-    const itens = [['Alongamento antes', !!d.alA], ['Kata 10×', (d.kata || 0) >= 10], ['Domínio (bloco)', dm ? dm.blocos.some(b => b.feito === x) : false], ['Alongamento depois', !!d.alD]];
-    const ok = itens.filter(i => i[1]).length; prev += 4; feito += ok; dias.push([x, ok / 4 * 100]);
-    itens.filter(i => !i[1]).forEach(i => falhas.push(`${fmtData(x)}: ${i[0]}`));
+/* ===== Resultado mensal ===== */
+const PIL = [['memoria', 'Kata Memória', '型記憶', '#b3241c'], ['polimento', 'Kata Polimento', '型研磨', '#1f5f8b'], ['kumite', 'Kumite', '組手', '#6b3f22'], ['along', 'Alongamentos', '柔軟', '#3b6d11']];
+function pilares(m, ate) {
+  const ini = m + '-01', fim = fimMes(m); ate = ate < fim ? ate : fim; const r = {}, pend = { memoria: [], polimento: [], kumite: [], along: [] };
+  // Kata Memória
+  const conclM = S.kmConcl.find(c => mes(c.data) === m && c.data <= ate);
+  if (conclM) r.memoria = 100; else {
+    let n = 0; const logs = [S.km ? S.km.log : {}].concat(S.kmConcl.map(c => c.log));
+    logs.forEach(l => Object.entries(l).forEach(([d, v]) => { if (d >= ini && d <= ate) n += v; }));
+    r.memoria = Math.min(100, n / 45 * 100); pend.memoria.push(S.km ? `${S.km.kata}: faltam ${45 - kmTotal(S.km)} execuções para concluir` : 'Nenhum kata em memorização');
   }
-  const sems = new Set(); for (let x = ini; x <= ate; x = soma(x, 1)) sems.add(semana(x));
-  sems.forEach(s => {
-    const k = p.kumite[s] || {};
-    [['Sanbon', k.sanbon >= 10], ['Kihon ippon', k.kihon >= 10], ['Jiyu ippon', k.jiyu >= 10], ['Kumite livre', !!k.lutei]].forEach(([n, ok]) => { prev++; if (ok) feito++; else falhas.push(`Semana ${fmtData(s)}: ${n}`); });
-  });
-  return { nota: prev ? feito / prev * 10 : 0, prev, feito, dias, falhas };
+  // Kata Polimento
+  const conclP = S.kpConcl.find(c => mes(c.data) === m && c.data <= ate);
+  if (conclP) r.polimento = 100; else {
+    let n = 0, tot = 1; if (S.kp && S.kp.blocos.length) { tot = S.kp.blocos.length * 20; S.kp.blocos.forEach(b => Object.entries(b.dias).forEach(([d, v]) => { if (d >= ini && d <= ate) n += v; })); }
+    r.polimento = Math.min(100, n / tot * 100); pend.polimento.push(S.kp && S.kp.blocos.length ? `${S.kp.kata}: faltam ${tot - kpReps(S.kp)} repetições (${S.kp.blocos.filter(b => b.r < 20).length} blocos)` : 'Nenhum kata em polimento');
+  }
+  // Kumite
+  const sems = []; for (let s = semana(ini); s <= ate; s = soma(s, 7)) if (s >= ini) sems.push(s);
+  if (!sems.length) sems.push(semana(ini));
+  let sk = 0; sems.forEach(s => { const k = S.kumite[s] || {}; const f = x => Math.min(1, (k[x] || 0) / 10);
+    const jy = JIYU.reduce((a, [id]) => a + f(id), 0) / 4; sk += (f('sanbon') + f('kihon') + f('jiyuippon') + jy) / 4;
+    [['sanbon', 'Sanbon'], ['kihon', 'Kihon ippon'], ['jiyuippon', 'Jiyu ippon']].forEach(([id, n]) => { if ((k[id] || 0) < 10) pend.kumite.push(`Semana ${fmtData(s)}: ${n} ${k[id] || 0}/10`); });
+    JIYU.forEach(([id, n]) => { if ((k[id] || 0) < 10) pend.kumite.push(`Semana ${fmtData(s)}: ${n.replace('Treino de ', 'Jiyu kumite · ')} ${k[id] || 0}/10`); }); });
+  r.kumite = sk / sems.length * 100;
+  // Alongamentos
+  let sa = 0, nd = 0; for (let x = ini; x <= ate; x = soma(x, 1)) { const a = (S.dias[x] || {}).alongDia || {}; const c = Object.values(a).filter(Boolean).length; sa += c / 13; nd++; if (c < 13) pend.along.push(`${fmtData(x)}: ${c}/13`); }
+  r.along = nd ? sa / nd * 100 : 0;
+  r.total = (r.memoria + r.polimento + r.kumite + r.along) / 4;
+  return { r, pend };
 }
-KV.prova = () => {
-  const m = mes(hoje()), p = P(), pv = p.prova[m] || (p.prova[m] = {}), a = avaliarMes(m);
-  const graf = a.dias.length ? `<div class="graf">${a.dias.map(([d, v]) => `<div><i style="height:${v}%"></i><small>${dt(d).getDate()}</small></div>`).join('')}</div>` : '<p class="peq">Sem treinos de karatê no mês ainda.</p>';
-  return `<section class="card"><h2>Prova interpessoal · ${m.slice(5)}/${m.slice(0, 4)}</h2>
-   ${chk(pv.videoIni, 'provaVid', 'videoIni', 'Gravei o vídeo do início do mês')}${chk(pv.videoFim, 'provaVid', 'videoFim', 'Gravei o vídeo do fim do mês')}
-   <p class="nota">${nf(a.nota, 1)}<small>/10</small></p><p class="peq">${a.feito} de ${a.prev} tarefas cumpridas (todas com o mesmo peso)</p>
-   <h3>Treinos do mês</h3>${graf}
-   <h3>Não cumprido</h3>${a.falhas.length ? '<ul>' + a.falhas.map(f => `<li>${f}</li>`).join('') + '</ul>' : '<p class="ok">Nada pendente 👏</p>'}</section>`;
+function curvas(m) {
+  const ini = m + '-01', fim = fimMes(m), ate = hoje() < fim ? hoje() : fim, serie = PIL.map(() => []), dias = [];
+  if (ate < ini) return { serie, dias };
+  for (let x = ini; x <= ate; x = soma(x, 1)) { const { r } = pilares(m, x); PIL.forEach(([k], j) => serie[j].push(r[k])); dias.push(x); }
+  return { serie, dias };
+}
+function graficoSvg(m) {
+  const { serie, dias } = curvas(m), N = Number(fimMes(m).slice(8));
+  const X = i => 40 + i * (550 / Math.max(1, N - 1)), Y = v => 200 - v * 1.8;
+  let g = [0, 25, 50, 75, 100].map(v => `<line x1="40" x2="590" y1="${Y(v)}" y2="${Y(v)}" stroke="#c9a86a" stroke-width=".6"/><text x="2" y="${Y(v) + 4}" font-size="11" fill="#5a3d26">${v}%</text>`).join('');
+  [1, 8, 15, 22, N].forEach(d => { g += `<text x="${X(d - 1) - 5}" y="216" font-size="10" fill="#5a3d26">${d}</text>`; });
+  PIL.forEach(([, , , c], j) => { if (!serie[j].length) return; g += `<polyline points="${serie[j].map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ')}" fill="none" stroke="${c}" stroke-width="2.5" stroke-linejoin="round"/><circle cx="${X(serie[j].length - 1)}" cy="${Y(serie[j][serie[j].length - 1])}" r="4" fill="${c}"/>`; });
+  return `<svg viewBox="0 0 600 222" class="graf-svg">${g}</svg><div class="leg">${PIL.map(([, n, , c]) => `<span><i style="background:${c}"></i>${n}</span>`).join('')}</div>`;
+}
+function pilaresHtml(r) {
+  return `<div class="pilares">${PIL.map(([k, n, kj]) => { const v = r[k]; return `<div><b style="color:${corNivel(v)}">${nf(v)}%</b><div class="pil" style="height:${Math.max(3, v * 1.3)}px;background:${corNivel(v)}"></div><div class="kjp">${kj}</div><small>${n}<br>${nf(v / 4, 1)} de 25%</small></div>`; }).join('')}</div>`;
+}
+let resMes = null;
+V['karate/resultado'] = (m) => {
+  m = m || resMes || mes(hoje()); resMes = m; const { r } = pilares(m, hoje());
+  return janela('karate_menu.jpg', 'Resultado Mensal', '結果', '#/karate', `<div class="washi">
+   <div class="nav-mes"><a class="btn sec" href="#/karate/resultado/${somaMes(m, -1)}">‹</a><b>${nomeMes(m)}</b>${m < mes(hoje()) ? `<a class="btn sec" href="#/karate/resultado/${somaMes(m, 1)}">›</a>` : '<span></span>'}</div>
+   <div class="nota" style="color:${corNivel(r.total)}">${nf(r.total)}%</div>
+   <h3>Oscilação no mês</h3>${graficoSvg(m)}<h3>Os 4 pilares</h3>${pilaresHtml(r)}</div>
+   <div class="washi rodape"><p class="lembrete">🎥 Para a sua autoavaliação: grave um vídeo no começo e no fim do mês.</p><a class="btn" href="#/karate/pdf/${m}">📄 Gerar PDF do resultado</a></div>`);
 };
-ACT.provaVid = c => { const pv = P().prova[mes(hoje())]; pv[c] = !pv[c]; salvar(); rerender(); };
-
-/* -- alongamentos -- */
-let timer = null;
-KV.along = () => {
-  const A = DATA.alongamentos, d = D();
-  const it = (a, i, tipo) => `<div class="card along">${chk((d.al || {})[tipo + i], 'alItem', tipo + i, a.nome, (tipo === 'e' ? a.tempo_s + ' s' : a.reps + ' repetições') + (a.nunca_pular ? ' · <b class="alerta">nunca pular</b>' : ''))}
-    <details><summary class="lnk">ver músculo e como fazer</summary>${mapa(a.musculos, { vista: mapaVistaForcada })}<div>${nomesMus(a.musculos)}</div><p>${a.como}</p></details>
-    ${tipo === 'e' ? `<button class="btn" data-act="alTimer" data-arg="30">⏱️ 30 s</button>` : ''}</div>`;
-  return `<section class="card"><h2>Antes do treino · dinâmico</h2><p class="peq">10 repetições cada.</p></section>
-   ${A.dinamicos.map((a, i) => it(a, i, 'd')).join('')}<section class="card">${chk(d.alA, 'kTog', 'alA', '✅ Concluí o alongamento antes')}</section>
-   <section class="card"><h2>Depois do treino · estático</h2><p class="peq">20–30 s por lado, com apito no final.</p></section>
-   ${A.estaticos.map((a, i) => it(a, i, 'e')).join('')}<section class="card">${chk(d.alD, 'kTog', 'alD', '✅ Concluí o alongamento depois')}</section>
-   <section class="card"><h3>Regras</h3><ul>${A.regras.map(r => `<li>${r}</li>`).join('')}</ul>
-   <table class="tab"><tr><th>Dia</th><th>Antes</th><th>Depois</th></tr><tr><td>Karatê</td><td>Dinâmico completo</td><td>Estático completo</td></tr><tr><td>Natação</td><td>Ombros, tronco, quadril, tornozelos</td><td>Ombros, peito, tríceps, lombar, panturrilha</td></tr><tr><td>Musculação</td><td>Músculos do dia</td><td>Músculos treinados</td></tr><tr><td>Yoga</td><td>—</td><td>Já é sessão de flexibilidade</td></tr></table></section>`;
+V['karate/pdf'] = (m) => {
+  m = m || mes(hoje()); const { r, pend } = pilares(m, hoje());
+  return `<div class="pdf-barra"><a href="#/karate/resultado/${m}" class="btn sec">‹ Voltar</a><button class="btn" data-act="imprimir">📄 Salvar em PDF</button><small>No celular: Compartilhar/Imprimir → “Salvar como PDF”.</small></div>
+  <div class="folha-r"><div class="fcab"><span class="kj">結果</span><div><h1>Resultado Mensal · Karatê</h1><p>${esc(S.perfil.nome)} · ${nomeMes(m)} · gerado em ${fmtData(hoje())}</p></div><div class="nota-p" style="color:${corNivel(r.total)}">${nf(r.total)}%</div></div>
+   ${graficoSvg(m)}${pilaresHtml(r)}
+   <h2>Pendências</h2>${PIL.map(([k, n]) => `<h3>${n} · ${nf(r[k])}%</h3>${pend[k].length && r[k] < 100 ? '<ul>' + pend[k].slice(0, 40).map(x => `<li>${esc(x)}</li>`).join('') + (pend[k].length > 40 ? `<li>… e mais ${pend[k].length - 40}</li>` : '') + '</ul>' : '<p class="ok">Nada pendente 👏</p>'}`).join('')}
+   <p class="lembrete">🎥 Lembrete: grave um vídeo no começo e no fim do mês para a sua autoavaliação.</p></div>`;
 };
-ACT.alItem = id => { const d = D(); d.al = d.al || {}; d.al[id] = !d.al[id]; salvar(); rerender(); };
-ACT.alTimer = (s) => {
-  clearInterval(timer); let t = Number(s);
-  const show = () => { const el = document.getElementById('cron'); if (el) el.innerHTML = `<b>${t}s</b> <button class="lnk" data-act="alPara">parar</button>`; };
-  show(); timer = setInterval(() => { t--; show(); if (t <= 0) { clearInterval(timer); timer = null; beep(); const el = document.getElementById('cron'); if (el) { el.innerHTML = '🔔 Tempo! Troque de lado.'; setTimeout(() => { if (!timer) el.innerHTML = ''; }, 4000); } } }, 1000);
-};
-ACT.alPara = () => { clearInterval(timer); timer = null; const el = document.getElementById('cron'); if (el) el.innerHTML = ''; };
+ACT.imprimir = () => window.print();

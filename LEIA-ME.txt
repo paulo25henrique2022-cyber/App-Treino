@@ -1,4 +1,4 @@
-APP DE TREINO - como publicar no GitHub Pages
+APP DE TREINO 2.0 - como publicar no GitHub Pages
 
 1. Extraia este .zip (botão direito > Extrair tudo).
 2. No GitHub, abra o repositório novo > "Add file" > "Upload files".
@@ -10,3 +10,6 @@ No celular (Chrome): abra o endereço > menu ⋮ > "Adicionar à tela inicial" (
 Use sempre o mesmo navegador e nunca a aba anônima. Faça o backup semanal em ⚙️.
 
 Atualizações: envie os arquivos novos do mesmo jeito (substituindo). Os dados no celular não são apagados.
+
+IMPORTANTE (versao 2.0): no GitHub, apague os arquivos antigos alimentacao.js e compras.js e a pasta img antiga antes de enviar estes.
+Na primeira vez, cada celular faz o proprio cadastro. Os dados da versao 1 nao passam para a 2.0.
