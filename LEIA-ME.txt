@@ -1,0 +1,12 @@
+APP DE TREINO - como publicar no GitHub Pages
+
+1. Extraia este .zip (botão direito > Extrair tudo).
+2. No GitHub, abra o repositório novo > "Add file" > "Upload files".
+3. Arraste TODOS os arquivos e a pasta "img" para a janela.
+4. Clique em "Commit changes".
+5. Settings > Pages > Branch: main > Save. Em 1-2 minutos aparece o endereço.
+
+No celular (Chrome): abra o endereço > menu ⋮ > "Adicionar à tela inicial" (ou "Instalar app").
+Use sempre o mesmo navegador e nunca a aba anônima. Faça o backup semanal em ⚙️.
+
+Atualizações: envie os arquivos novos do mesmo jeito (substituindo). Os dados no celular não são apagados.
