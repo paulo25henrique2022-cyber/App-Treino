@@ -136,20 +136,35 @@ V['karate/treino/kumite'] = sub => {
 };
 ACT.kuCont = a => { const [id, d] = a.split('|'); const k = kumSem(); const v = (k[id] || 0) + Number(d); if (v < 0 || v > 10) return; k[id] = v; salvar(); rerender(); };
 
-/* ===== Alongamentos (sessão diária, 13 estáticos) ===== */
-let timer = null;
+/* ===== Alongamentos (sessão diária: meta de 20 à escolha) ===== */
+const META_AL = 20;
+let timer = null, alReg = null;
 function KAlong() {
   const A = DATA.alongamentos.estaticos, d = D(), al = d.alongDia || {}, n = A.filter((_, i) => al[i]).length;
-  return JT('Alongamentos', '柔軟', `<div class="washi"><p>Sessão de hoje: <b>${n}/13</b></p>${barra(n / 13 * 100)}<p class="peq">1 sessão por dia, em qualquer horário · 20–30 s por lado · os checks zeram à meia-noite.</p></div>
-   ${A.map((a, i) => `<div class="washi along">${chk(al[i], 'alItem', i, esc(a.nome), a.tempo_s + ' s' + (a.nunca_pular ? ' · <b class="alerta">nunca pular</b>' : ''))}
-     <p>${esc(a.como)}</p><button class="btn sec" data-act="alTimer" data-arg="30">⏱️ 30 s</button>
+  const R = DATA.alongamentos.regioes, feitas = new Set(A.filter((_, i) => al[i]).map(a => a.regiao));
+  const faltam = R.filter(r => !feitas.has(r) && A.some(a => a.regiao === r));
+  const bal = R.filter(r => A.some(a => a.regiao === r)).map(r => { const q = A.filter((a, i) => a.regiao === r && al[i]).length;
+    return `<button class="balao ${alReg === r ? 'on' : ''}" style="--c:${q ? '#3b6d11' : '#b3241c'}" data-act="alReg" data-arg="${esc(r)}">${esc(r)}<small>${q ? '✓ ' + q : 'falta'}</small></button>`; }).join('');
+  const lista = alReg ? A.map((a, i) => [a, i]).filter(([a]) => a.regiao === alReg) : [];
+  return JT('Alongamentos', '柔軟', `<div class="washi"><p>Sessão de hoje: <b>${Math.min(n, META_AL)}/${META_AL}</b>${n > META_AL ? ` (+${n - META_AL})` : ''}</p>${barra(Math.min(n / META_AL, 1) * 100)}
+   <p class="peq">Escolha ${META_AL} alongamentos por dia · 2 a 4 × 30 s por músculo · estático depois do treino, dinâmico antes · os checks zeram à meia-noite.</p>
+   ${faltam.length ? `<p class="peq"><b>Regiões ainda não alongadas hoje:</b> ${faltam.map(esc).join(', ')}</p>` : '<p class="peq"><b>Todas as regiões alongadas hoje ✓</b></p>'}</div>
+   <div class="washi"><h3>Escolha a região</h3><div class="baloes">${bal}</div></div>
+   ${lista.map(([a, i]) => `<div class="washi along">${chk(al[i], 'alItem', i, esc(a.nome), a.tempo_s + ' s' + (a.nunca_pular ? ' · <b class="alerta">nunca pular</b>' : ''))}
+     <p>${esc(a.como)}</p>${a.video ? `<a class="btn yt" href="${esc(a.video)}" target="_blank" rel="noopener">▶ Ver vídeo</a> ` : ''}<button class="btn sec" data-act="alTimer" data-arg="30">⏱️ 30 s</button>
      <details><summary class="lnk">ver músculo alongado</summary>${mapa(a.musculos)}<div>${nomesMus(a.musculos)}</div></details>${linksBloco('al:' + i, 2)}</div>`).join('')}`);
 }
+ACT.alReg = r => { alReg = alReg === r ? null : r; rerender(); };
 ACT.alItem = i => { const d = D(); d.alongDia = d.alongDia || {}; d.alongDia[i] = !d.alongDia[i]; salvar(); rerender(); };
 ACT.alTimer = s => {
-  clearInterval(timer); let t = +s; const el = document.getElementById('cron');
-  const show = () => { el.innerHTML = `<b>${t}s</b> <button class="lnk" data-act="alPara">parar</button>`; };
-  show(); timer = setInterval(() => { t--; show(); if (t <= 0) { clearInterval(timer); timer = null; beep(); el.innerHTML = '🔔 Tempo!'; setTimeout(() => { if (!timer) el.innerHTML = ''; }, 4000); } }, 1000);
+  clearInterval(timer); let pre = 5, t = +s; const el = document.getElementById('cron');
+  const show = () => { el.innerHTML = pre > 0 ? `Prepare-se… <b>${pre}</b> <button class="lnk" data-act="alPara">parar</button>` : `<b>${t}s</b> <button class="lnk" data-act="alPara">parar</button>`; };
+  tique(); show();
+  timer = setInterval(() => {
+    if (pre > 0) { pre--; tique(pre === 0); show(); return; }
+    t--; show(); if (t > 0 && t <= 3) tique();
+    if (t <= 0) { clearInterval(timer); timer = null; sino(); el.innerHTML = '🔔 Tempo!'; setTimeout(() => { if (!timer) el.innerHTML = ''; }, 4000); }
+  }, 1000);
 };
 ACT.alPara = () => { clearInterval(timer); timer = null; document.getElementById('cron').innerHTML = ''; };
 
@@ -201,7 +216,7 @@ function pilares(m, ate) {
     JIYU.forEach(([id, n]) => { if ((k[id] || 0) < 10) pend.kumite.push(`Semana ${fmtData(s)}: ${n.replace('Treino de ', 'Jiyu kumite · ')} ${k[id] || 0}/10`); }); });
   r.kumite = sk / sems.length * 100;
   // Alongamentos
-  let sa = 0, nd = 0; for (let x = ini; x <= ate; x = soma(x, 1)) { const a = (S.dias[x] || {}).alongDia || {}; const c = Object.values(a).filter(Boolean).length; sa += c / 13; nd++; if (c < 13) pend.along.push(`${fmtData(x)}: ${c}/13`); }
+  let sa = 0, nd = 0; for (let x = ini; x <= ate; x = soma(x, 1)) { const a = (S.dias[x] || {}).alongDia || {}; const c = Object.values(a).filter(Boolean).length; sa += Math.min(c / META_AL, 1); nd++; if (c < META_AL) pend.along.push(`${fmtData(x)}: ${c}/${META_AL}`); }
   r.along = nd ? sa / nd * 100 : 0;
   r.total = (r.memoria + r.polimento + r.kumite + r.along) / 4;
   return { r, pend };

@@ -99,7 +99,7 @@ V.config = () => janela('karate_menu.jpg', 'Configurações', '設定', '#/', `
   <div class="washi"><h3>💾 Backup</h3><p class="peq">Os dados ficam só neste navegador. Limpar os dados do navegador, trocar de celular ou usar aba anônima apaga tudo. Faça backup toda semana e guarde no Google Drive ou no WhatsApp.</p>
    <p>Último backup: <b>${S.backup ? fmtData(S.backup) : 'nunca'}</b></p>
    <button class="btn" data-act="backup">Exportar backup</button><label class="btn sec">Importar backup<input type="file" accept=".json,application/json" hidden data-chg="importar"></label></div>
-  <div class="washi peq">App de Treino · versão 2.0 · dados locais · katas: SKIF/Kanazawa · termos: Nippon Budōkan/JKF/JKA · ciência: ACSM, Cochrane, meta-análises citadas nas telas.</div>`);
+  <div class="washi peq">App de Treino · versão 2.1 · dados locais · katas: SKIF/Kanazawa · termos: Nippon Budōkan/JKF/JKA · ciência: ACSM, Cochrane, meta-análises citadas nas telas.</div>`);
 ACT.backup = () => { S.backup = hoje(); salvar(); entregar(new Blob([JSON.stringify({ tipo: 'backup-treino', S })], { type: 'application/json' }), `backup-treino-${hoje()}.json`, true); rerender(); };
 ACT.importar = (_, el) => {
   const f = el.files[0]; if (!f) return; const r = new FileReader();

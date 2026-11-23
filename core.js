@@ -97,6 +97,16 @@ function beep(n = 3) {
     if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) {}
 }
 
+/* sons do timer: tique curto e sino (acorde de 4 notas, mais claro e agradável) */
+let _ac = null;
+function _ctx() { _ac = _ac || new (window.AudioContext || window.webkitAudioContext)(); if (_ac.state === 'suspended') _ac.resume(); return _ac; }
+function _nota(c, f, t, dur, vol, tipo = 'sine') { const o = c.createOscillator(), g = c.createGain(); o.type = tipo; o.frequency.value = f; o.connect(g); g.connect(c.destination);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); o.start(t); o.stop(t + dur + 0.05); }
+function tique(forte = false) { try { const c = _ctx(); _nota(c, forte ? 1320 : 990, c.currentTime, forte ? 0.25 : 0.12, forte ? 0.5 : 0.35, 'triangle'); if (navigator.vibrate) navigator.vibrate(forte ? 150 : 40); } catch (e) {} }
+function sino() { try { const c = _ctx(), t0 = c.currentTime;
+  for (let r = 0; r < 2; r++) [[784, 0], [988, 0.12], [1175, 0.24], [1568, 0.36]].forEach(([f, dt]) => { _nota(c, f, t0 + r * 0.9 + dt, 0.8, 0.45); _nota(c, f * 2, t0 + r * 0.9 + dt, 0.4, 0.08); });
+  if (navigator.vibrate) navigator.vibrate([300, 120, 300, 120, 500]); } catch (e) {} }
+
 /* ---- roteador ---- */
 function render() {
   const r = location.hash.replace(/^#\/?/, '') || 'inicio';
